@@ -13507,6 +13507,9 @@ initCom(PDFViewerApplication);
     }
     try {
       const viewerOrigin = new URL(window.location.href).origin || "null";
+      if (viewerOrigin.startsWith("chrome-extension://")) {
+        return;
+      }
       if (HOSTED_VIEWER_ORIGINS.includes(viewerOrigin)) {
         return;
       }
