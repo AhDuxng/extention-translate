@@ -97,10 +97,6 @@
       .replace(/'/g, "&#039;");
   }
 
-  function delay(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-  }
-
   function showLoadingPopup(rect, direction) {
     const popup = getOrCreatePopup();
     popup.innerHTML = `
@@ -119,7 +115,7 @@
     popup.querySelector(".qvt-close").addEventListener("click", removePopup);
   }
 
-  async function renderProgressiveReveal(data, direction) {
+  function renderQuick(data, direction) {
     const popup = document.getElementById(POPUP_ID);
     if (!popup) return;
 
@@ -136,17 +132,21 @@
           <span class="qvt-translation">${escapeHtml(data.translation)}</span>
           <button class="qvt-copy" title="Copy" data-copy="${escapeHtml(data.translation)}">📋</button>
         </div>
-        <div id="qvt-explanation-slot"></div>
+        <div id="qvt-explanation-slot" class="qvt-fetching-details">
+           <div class="qvt-dots"><span></span><span></span><span></span></div>
+        </div>
         <div id="qvt-example-slot"></div>
-        ${data.fromCache ? '<div class="qvt-cache-badge">⚡ Cache</div>' : ""}
       </div>
     `;
-
     popup.querySelector(".qvt-close").addEventListener("click", removePopup);
     setupCopyButton(popup);
+  }
+
+  function renderDetails(data, direction) {
+    const popup = document.getElementById(POPUP_ID);
+    if (!popup) return;
 
     if (data.explanation) {
-      await delay(180);
       const slot = document.getElementById("qvt-explanation-slot");
       if (slot) {
         const el = document.createElement("div");
@@ -157,7 +157,6 @@
     }
 
     if (data.example) {
-      await delay(160);
       const slot = document.getElementById("qvt-example-slot");
       if (slot) {
         const label = direction === "vi-en" ? "Example" : "Ví dụ";
@@ -170,6 +169,16 @@
         `;
         slot.replaceWith(block);
       }
+    }
+  }
+
+  function renderFull(data, direction) {
+    renderQuick(data, direction);
+    renderDetails(data, direction);
+    const popup = document.getElementById(POPUP_ID);
+    if (popup && data.fromCache) {
+      const body = popup.querySelector(".qvt-body");
+      if (body) body.insertAdjacentHTML('beforeend', '<div class="qvt-cache-badge">⚡ Cache</div>');
     }
   }
 
@@ -197,16 +206,37 @@
     });
   }
 
+  function getSelectionText() {
+    let text = "";
+    let rect = null;
+
+    // 1. Trích xuất từ text selection tiêu chuẩn
+    const selection = window.getSelection();
+    if (selection && selection.toString().trim()) {
+      text = selection.toString().trim();
+      rect = selection.getRangeAt(0).getBoundingClientRect();
+    }
+    // 2. Trích xuất từ thẻ input / textarea
+    else if (document.activeElement && 
+            (document.activeElement.tagName === "TEXTAREA" || 
+             (document.activeElement.tagName === "INPUT" && document.activeElement.type === "text"))) {
+      const el = document.activeElement;
+      if (el.selectionStart !== undefined && el.selectionEnd !== undefined) {
+        text = el.value.substring(el.selectionStart, el.selectionEnd).trim();
+        rect = el.getBoundingClientRect(); // Lấy toạ độ input
+      }
+    }
+
+    return { text, rect };
+  }
+
   async function handleSelection() {
     if (!isEnabled) return;
 
-    const selection = window.getSelection();
-    const selectedText = selection ? selection.toString().trim() : "";
-    if (!isValidSelection(selectedText)) return;
+    const { text, rect } = getSelectionText();
+    if (!isValidSelection(text) || !rect) return;
 
-    const range = selection.getRangeAt(0);
-    const rect = range.getBoundingClientRect();
-    const direction = resolveDirection(selectedText);
+    const direction = resolveDirection(text);
 
     showLoadingPopup(rect, direction);
     disconnectPort();
@@ -215,8 +245,13 @@
     currentPort = port;
 
     port.onMessage.addListener((message) => {
-      if (message.type === "done") {
-        renderProgressiveReveal(message.data, direction);
+      if (message.type === "done_quick") {
+        renderQuick(message.data, direction);
+      } else if (message.type === "done_details") {
+        renderDetails(message.data, direction);
+        disconnectPort();
+      } else if (message.type === "done_full") {
+        renderFull(message.data, direction);
         disconnectPort();
       } else if (message.type === "error") {
         renderError(message.message);
@@ -228,18 +263,20 @@
       currentPort = null;
     });
 
-    port.postMessage({ type: "TRANSLATE_STREAM", text: selectedText, direction });
+    port.postMessage({ type: "TRANSLATE_QUICK", text, direction });
   }
 
+  // Sử dụng { capture: true } để đánh chặn sự kiện chuột 
+  // TRƯỚC KHI các trang web phức tạp (Facebook, Google Docs) kịp gọi stopPropagation
   document.addEventListener("mouseup", () => {
     clearTimeout(selectionTimer);
     selectionTimer = setTimeout(handleSelection, 250);
-  });
+  }, { capture: true });
 
   document.addEventListener("mousedown", (e) => {
     const popup = document.getElementById(POPUP_ID);
     if (popup && !popup.contains(e.target)) removePopup();
-  });
+  }, { capture: true });
 
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") removePopup();

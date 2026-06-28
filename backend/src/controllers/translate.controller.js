@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { translateWithOpenAI } from "../services/openai.service.js";
+import { translateQuick, translateDetails } from "../services/openai.service.js";
 import { isValidTextForTranslation, autoDetectDirection } from "../utils/validate-text.js";
 
 const translateSchema = z.object({
@@ -9,11 +9,13 @@ const translateSchema = z.object({
     .min(1, { message: "Text không được để trống." })
     .max(200, { message: "Text không được quá 200 ký tự." }),
   direction: z.enum(["en-vi", "vi-en", "auto"]).optional().default("auto"),
+  mode: z.enum(["quick", "details"]).optional().default("quick"),
+  translation: z.string().optional(), // Dùng cho mode details
 });
 
 export const translateController = async (req, res, next) => {
   try {
-    const { text, direction: reqDirection } = translateSchema.parse(req.body);
+    const { text, direction: reqDirection, mode, translation } = translateSchema.parse(req.body);
 
     if (!isValidTextForTranslation(text)) {
       return res.status(400).json({
@@ -23,7 +25,13 @@ export const translateController = async (req, res, next) => {
     }
 
     const direction = reqDirection === "auto" ? autoDetectDirection(text) : reqDirection;
-    const result = await translateWithOpenAI(text, direction);
+    
+    let result;
+    if (mode === "quick") {
+      result = await translateQuick(text, direction);
+    } else {
+      result = await translateDetails(text, direction, translation);
+    }
 
     return res.json({ success: true, data: result });
   } catch (error) {

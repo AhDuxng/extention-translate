@@ -1,325 +1,333 @@
 <!DOCTYPE html>
 <html lang="vi">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Quick Viet Translator</title>
-    <style>
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quick Viet Translator</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 300px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+        "Helvetica Neue", Arial, sans-serif;
+      background: #0a0f1e;
+      color: #e2e8f0;
+      font-size: 13px;
+    }
+
+    .popup-header {
+      padding: 14px 16px 12px;
+      background: linear-gradient(135deg, #14103c 0%, #2d2864 100%);
+      border-bottom: 1px solid rgba(99, 102, 241, 0.2);
+    }
+
+    .popup-brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .popup-icon {
+      font-size: 20px;
+    }
+
+    .popup-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #c7d2fe;
+      letter-spacing: -0.01em;
+    }
+
+    .popup-subtitle {
+      font-size: 10px;
+      color: #6366f1;
+      margin-top: 1px;
+    }
+
+    .popup-section {
+      padding: 13px 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .section-label {
+      font-size: 10px;
+      font-weight: 700;
+      color: #4b5563;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 9px;
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .toggle-label {
+      font-size: 13px;
+      color: #cbd5e1;
+      font-weight: 500;
+    }
+
+    .toggle-desc {
+      font-size: 11px;
+      color: #374155;
+      margin-top: 3px;
+    }
+
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 40px;
+      height: 22px;
+      flex-shrink: 0;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #1a1f35;
+      border: 1px solid #2d3250;
+      transition: 0.25s;
+      border-radius: 22px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 16px;
+      width: 16px;
+      left: 2px;
+      bottom: 2px;
+      background-color: #374155;
+      transition: 0.25s;
+      border-radius: 50%;
+    }
+
+    input:checked+.slider {
+      background-color: #4f46e5;
+      border-color: #6366f1;
+    }
+
+    input:checked+.slider:before {
+      transform: translateX(18px);
+      background-color: #ffffff;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 20px;
+      margin-top: 7px;
+    }
+
+    .status-badge.active {
+      background: rgba(74, 222, 128, 0.08);
+      color: #4ade80;
+      border: 1px solid rgba(74, 222, 128, 0.18);
+    }
+
+    .status-badge.inactive {
+      background: rgba(100, 116, 139, 0.08);
+      color: #64748b;
+      border: 1px solid rgba(100, 116, 139, 0.15);
+    }
+
+    .status-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .status-badge.active .status-dot {
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1;
       }
 
-      body {
-        width: 300px;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-          "Helvetica Neue", Arial, sans-serif;
-        background: #0a0f1e;
-        color: #e2e8f0;
-        font-size: 13px;
+      50% {
+        opacity: 0.3;
       }
+    }
 
-      .popup-header {
-        padding: 14px 16px 12px;
-        background: linear-gradient(135deg, #14103c 0%, #2d2864 100%);
-        border-bottom: 1px solid rgba(99, 102, 241, 0.2);
-      }
+    /* Direction Selector */
+    .dir-selector {
+      display: flex;
+      background: #111827;
+      border: 1px solid #1f2937;
+      border-radius: 10px;
+      padding: 3px;
+      gap: 2px;
+    }
 
-      .popup-brand {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      }
+    .dir-btn {
+      flex: 1;
+      border: none;
+      padding: 5px 4px;
+      border-radius: 7px;
+      font-size: 10px;
+      font-weight: 700;
+      cursor: pointer;
+      color: #4b5563;
+      background: transparent;
+      transition: all 0.18s;
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+    }
 
-      .popup-icon {
-        font-size: 20px;
-      }
+    .dir-btn:hover {
+      color: #9ca3af;
+      background: rgba(255, 255, 255, 0.04);
+    }
 
-      .popup-title {
-        font-size: 14px;
-        font-weight: 700;
-        color: #c7d2fe;
-        letter-spacing: -0.01em;
-      }
+    .dir-btn.active {
+      background: linear-gradient(135deg, #4f46e5, #6366f1);
+      color: #ffffff;
+      box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
+    }
 
-      .popup-subtitle {
-        font-size: 10px;
-        color: #6366f1;
-        margin-top: 1px;
-      }
+    /* Cache Section */
+    .cache-info {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
 
-      .popup-section {
-        padding: 13px 16px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-      }
+    .cache-count {
+      font-size: 12px;
+      color: #4b5563;
+    }
 
-      .section-label {
-        font-size: 10px;
-        font-weight: 700;
-        color: #4b5563;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        margin-bottom: 9px;
-      }
+    .cache-count span {
+      color: #818cf8;
+      font-weight: 700;
+    }
 
-      .toggle-row {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-      }
+    .btn-clear {
+      background: rgba(239, 68, 68, 0.08);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      color: #f87171;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
 
-      .toggle-label {
-        font-size: 13px;
-        color: #cbd5e1;
-        font-weight: 500;
-      }
+    .btn-clear:hover {
+      background: rgba(239, 68, 68, 0.15);
+      border-color: rgba(239, 68, 68, 0.4);
+    }
 
-      .toggle-desc {
-        font-size: 11px;
-        color: #374155;
-        margin-top: 3px;
-      }
+    .btn-clear:active {
+      transform: scale(0.97);
+    }
 
-      .switch {
-        position: relative;
-        display: inline-block;
-        width: 40px;
-        height: 22px;
-        flex-shrink: 0;
-      }
+    .btn-clear:disabled {
+      opacity: 0.5;
+      cursor: default;
+      transform: none;
+    }
 
-      .switch input {
-        opacity: 0;
-        width: 0;
-        height: 0;
-      }
+    .popup-footer {
+      padding: 9px 16px;
+      background: rgba(0, 0, 0, 0.25);
+      text-align: center;
+    }
 
-      .slider {
-        position: absolute;
-        cursor: pointer;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background-color: #1a1f35;
-        border: 1px solid #2d3250;
-        transition: 0.25s;
-        border-radius: 22px;
-      }
+    .popup-footer p {
+      font-size: 10px;
+      color: #1f2937;
+      line-height: 1.4;
+    }
 
-      .slider:before {
-        position: absolute;
-        content: "";
-        height: 16px;
-        width: 16px;
-        left: 2px;
-        bottom: 2px;
-        background-color: #374155;
-        transition: 0.25s;
-        border-radius: 50%;
-      }
+    .popup-footer code {
+      color: #374155;
+      font-size: 9px;
+    }
+  </style>
+</head>
 
-      input:checked + .slider {
-        background-color: #4f46e5;
-        border-color: #6366f1;
-      }
-
-      input:checked + .slider:before {
-        transform: translateX(18px);
-        background-color: #ffffff;
-      }
-
-      .status-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-        font-size: 10px;
-        font-weight: 600;
-        padding: 2px 8px;
-        border-radius: 20px;
-        margin-top: 7px;
-      }
-
-      .status-badge.active {
-        background: rgba(74, 222, 128, 0.08);
-        color: #4ade80;
-        border: 1px solid rgba(74, 222, 128, 0.18);
-      }
-
-      .status-badge.inactive {
-        background: rgba(100, 116, 139, 0.08);
-        color: #64748b;
-        border: 1px solid rgba(100, 116, 139, 0.15);
-      }
-
-      .status-dot {
-        width: 5px;
-        height: 5px;
-        border-radius: 50%;
-        background: currentColor;
-      }
-
-      .status-badge.active .status-dot {
-        animation: pulse 2s infinite;
-      }
-
-      @keyframes pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.3; }
-      }
-
-      /* Direction Selector */
-      .dir-selector {
-        display: flex;
-        background: #111827;
-        border: 1px solid #1f2937;
-        border-radius: 10px;
-        padding: 3px;
-        gap: 2px;
-      }
-
-      .dir-btn {
-        flex: 1;
-        border: none;
-        padding: 5px 4px;
-        border-radius: 7px;
-        font-size: 10px;
-        font-weight: 700;
-        cursor: pointer;
-        color: #4b5563;
-        background: transparent;
-        transition: all 0.18s;
-        letter-spacing: 0.02em;
-        white-space: nowrap;
-      }
-
-      .dir-btn:hover {
-        color: #9ca3af;
-        background: rgba(255, 255, 255, 0.04);
-      }
-
-      .dir-btn.active {
-        background: linear-gradient(135deg, #4f46e5, #6366f1);
-        color: #ffffff;
-        box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
-      }
-
-      /* Cache Section */
-      .cache-info {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 8px;
-      }
-
-      .cache-count {
-        font-size: 12px;
-        color: #4b5563;
-      }
-
-      .cache-count span {
-        color: #818cf8;
-        font-weight: 700;
-      }
-
-      .btn-clear {
-        background: rgba(239, 68, 68, 0.08);
-        border: 1px solid rgba(239, 68, 68, 0.2);
-        color: #f87171;
-        padding: 4px 10px;
-        border-radius: 6px;
-        font-size: 11px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.15s;
-      }
-
-      .btn-clear:hover {
-        background: rgba(239, 68, 68, 0.15);
-        border-color: rgba(239, 68, 68, 0.4);
-      }
-
-      .btn-clear:active {
-        transform: scale(0.97);
-      }
-
-      .btn-clear:disabled {
-        opacity: 0.5;
-        cursor: default;
-        transform: none;
-      }
-
-      .popup-footer {
-        padding: 9px 16px;
-        background: rgba(0, 0, 0, 0.25);
-        text-align: center;
-      }
-
-      .popup-footer p {
-        font-size: 10px;
-        color: #1f2937;
-        line-height: 1.4;
-      }
-
-      .popup-footer code {
-        color: #374155;
-        font-size: 9px;
-      }
-    </style>
-  </head>
-
-  <body>
-    <div class="popup-header">
-      <div class="popup-brand">
-        <span class="popup-icon">🔤</span>
-        <div>
-          <div class="popup-title">Quick Viet Translator</div>
-          <div class="popup-subtitle">Powered by GPT-4o mini · Streaming</div>
-        </div>
+<body>
+  <div class="popup-header">
+    <div class="popup-brand">
+      <div>
+        <div class="popup-title">Quick Viet Translator</div>
+        <div class="popup-subtitle">Powered by GPT-4o mini · Streaming</div>
       </div>
     </div>
+  </div>
 
-    <div class="popup-section">
-      <div class="toggle-row">
-        <div>
-          <div class="toggle-label">Auto Translate</div>
-          <div class="toggle-desc">Bôi đen text để dịch ngay</div>
-        </div>
-        <label class="switch">
-          <input type="checkbox" id="toggle-enabled" checked />
-          <span class="slider"></span>
-        </label>
+  <div class="popup-section">
+    <div class="toggle-row">
+      <div>
+        <div class="toggle-label">Auto Translate</div>
+        <div class="toggle-desc">Bôi đen text để dịch ngay</div>
       </div>
-      <div id="status-badge" class="status-badge active">
-        <div class="status-dot"></div>
-        <span id="status-text">Đang hoạt động</span>
+      <label class="switch">
+        <input type="checkbox" id="toggle-enabled" checked />
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div id="status-badge" class="status-badge active">
+      <div class="status-dot"></div>
+      <span id="status-text">Đang hoạt động</span>
+    </div>
+  </div>
+
+  <div class="popup-section">
+    <div class="section-label">Chiều dịch</div>
+    <div class="dir-selector" id="dir-selector">
+      <button class="dir-btn active" id="btn-auto" data-dir="auto">Auto</button>
+      <button class="dir-btn" id="btn-en-vi" data-dir="en-vi">EN → VI</button>
+      <button class="dir-btn" id="btn-vi-en" data-dir="vi-en">VI → EN</button>
+    </div>
+  </div>
+
+  <div class="popup-section">
+    <div class="cache-info">
+      <div>
+        <div class="toggle-label">Cache từ đã dịch</div>
+        <div class="cache-count">Đã lưu: <span id="cache-count">0</span> từ</div>
       </div>
+      <button class="btn-clear" id="btn-clear-cache">Xóa cache</button>
     </div>
+  </div>
 
-    <div class="popup-section">
-      <div class="section-label">Chiều dịch</div>
-      <div class="dir-selector" id="dir-selector">
-        <button class="dir-btn active" id="btn-auto" data-dir="auto">🔍 Auto</button>
-        <button class="dir-btn" id="btn-en-vi" data-dir="en-vi">EN → VI</button>
-        <button class="dir-btn" id="btn-vi-en" data-dir="vi-en">VI → EN</button>
-      </div>
-    </div>
+  <div class="popup-footer">
+    <p>Backend: <code>localhost:3000</code> · Không lưu API key</p>
+  </div>
 
-    <div class="popup-section">
-      <div class="cache-info">
-        <div>
-          <div class="toggle-label">Cache từ đã dịch</div>
-          <div class="cache-count">Đã lưu: <span id="cache-count">0</span> từ</div>
-        </div>
-        <button class="btn-clear" id="btn-clear-cache">Xóa cache</button>
-      </div>
-    </div>
+  <script src="popup.js"></script>
+</body>
 
-    <div class="popup-footer">
-      <p>Backend: <code>localhost:3000</code> · Không lưu API key</p>
-    </div>
-
-    <script src="popup.js"></script>
-  </body>
 </html>

@@ -1,11 +1,12 @@
 {
   "manifest_version": 3,
   "name": "Quick Viet Translator",
-  "version": "1.1.0",
-  "description": "Bôi đen từ để dịch ngay. Hỗ trợ EN↔VI, streaming, auto-detect.",
-  "permissions": ["storage", "tabs"],
+  "version": "1.2.0",
+  "description": "Bôi đen từ để dịch ngay. Hỗ trợ EN↔VI, tốc độ cao, hoạt động trên mọi web và PDF.",
+  "permissions": ["storage", "tabs", "webNavigation"],
   "host_permissions": [
-    "https://quick-viet-translator-backend.onrender.com/*"
+    "https://quick-viet-translator-backend.onrender.com/*",
+    "<all_urls>"
   ],
   "background": {
     "service_worker": "background.js"
@@ -14,10 +15,17 @@
     {
       "matches": ["<all_urls>"],
       "js": ["content.js"],
-      "css": ["styles.css"]
+      "css": ["styles.css"],
+      "all_frames": true
     }
   ],
   "action": {
     "default_popup": "popup.html"
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["pdf.js/*"],
+      "matches": ["<all_urls>"]
+    }
+  ]
 }
