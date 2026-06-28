@@ -6,20 +6,26 @@ const statusText = document.getElementById("status-text");
 const cacheCountEl = document.getElementById("cache-count");
 const btnClearCache = document.getElementById("btn-clear-cache");
 const dirSelector = document.getElementById("dir-selector");
+const backendUrlEl = document.getElementById("backend-url");
+const btnSaveBackend = document.getElementById("btn-save-backend");
 
-chrome.storage.local.get(["enabled", "direction"], (result) => {
+const DEFAULT_BACKEND_BASE = "https://quick-viet-translator-backend.onrender.com";
+
+chrome.storage.local.get(["enabled", "direction", "backendUrl"], (result) => {
   const isEnabled = result.enabled !== false;
   toggleEl.checked = isEnabled;
   updateStatusBadge(isEnabled);
 
   const dir = result.direction || "auto";
   updateDirButtons(dir);
+
+  backendUrlEl.value = toBackendBase(result.backendUrl || DEFAULT_BACKEND_BASE);
 });
 
 function refreshCacheCount() {
   chrome.storage.local.get(null, (items) => {
     const count = Object.keys(items).filter(
-      (k) => k !== "enabled" && k !== "direction"
+      (k) => !["enabled", "direction", "backendUrl"].includes(k)
     ).length;
     cacheCountEl.textContent = count;
   });
@@ -63,16 +69,38 @@ function broadcastToTabs(message) {
   chrome.tabs.query({}, (tabs) => {
     tabs.forEach((tab) => {
       if (tab.id) {
-        chrome.tabs.sendMessage(tab.id, message).catch(() => {});
+        chrome.tabs.sendMessage(tab.id, message, () => {
+          chrome.runtime.lastError;
+        });
       }
     });
   });
 }
 
+btnSaveBackend.addEventListener("click", () => {
+  const backendUrl = toBackendBase(backendUrlEl.value);
+
+  if (!/^https?:\/\//i.test(backendUrl)) {
+    showFeedback(btnSaveBackend, "URL sai", "!");
+    return;
+  }
+
+  chrome.storage.local.set({ backendUrl }, () => {
+    showFeedback(btnSaveBackend, "Đã lưu", "OK");
+  });
+});
+
+function toBackendBase(value) {
+  return String(value || "")
+    .trim()
+    .replace(/\/+$/, "")
+    .replace(/\/api\/translate$/i, "");
+}
+
 btnClearCache.addEventListener("click", () => {
   chrome.storage.local.get(null, (items) => {
     const keysToRemove = Object.keys(items).filter(
-      (k) => k !== "enabled" && k !== "direction"
+      (k) => !["enabled", "direction", "backendUrl"].includes(k)
     );
 
     if (keysToRemove.length === 0) {

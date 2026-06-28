@@ -1,17 +1,33 @@
 "use strict";
 
-const BACKEND_URL = "https://quick-viet-translator-backend.onrender.com/api/translate";
+const DEFAULT_BACKEND_URL = "https://quick-viet-translator-backend.onrender.com/api/translate";
+const LOCAL_BACKEND_URL = "http://localhost:3000/api/translate";
+const EXTENSION_ORIGIN = chrome.runtime.getURL("");
 
 // --- PDF.js Intercept ---
 chrome.webNavigation.onBeforeNavigate.addListener((details) => {
-  if (details.frameId === 0) {
-    const url = details.url.toLowerCase();
-    if (url.endsWith(".pdf") || url.includes(".pdf?")) {
-      const viewerUrl = chrome.runtime.getURL("pdf.js/web/viewer.html") + "?file=" + encodeURIComponent(details.url);
-      chrome.tabs.update(details.tabId, { url: viewerUrl });
-    }
+  if (details.frameId !== 0 || isExtensionUrl(details.url) || !isPdfUrl(details.url)) {
+    return;
   }
+
+  const viewerUrl = chrome.runtime.getURL("pdf.js/web/viewer.html") + "?file=" + encodeURIComponent(details.url);
+  chrome.tabs.update(details.tabId, { url: viewerUrl }, () => {
+    chrome.runtime.lastError;
+  });
 });
+
+function isExtensionUrl(url) {
+  return url.startsWith(EXTENSION_ORIGIN);
+}
+
+function isPdfUrl(rawUrl) {
+  try {
+    const url = new URL(rawUrl);
+    return ["http:", "https:", "file:", "ftp:"].includes(url.protocol) && url.pathname.toLowerCase().endsWith(".pdf");
+  } catch {
+    return /\.pdf(?:[?#].*)?$/i.test(rawUrl);
+  }
+}
 
 // --- Translation Logic ---
 async function getCachedTranslation(text, direction) {
@@ -26,18 +42,58 @@ async function setCachedTranslation(text, direction, data) {
 }
 
 async function translateMode(text, direction, mode, translationStr = "", signal) {
-  const response = await fetch(BACKEND_URL, {
+  const backendUrl = await getBackendUrl();
+
+  try {
+    return await requestTranslation(backendUrl, text, direction, mode, translationStr, signal);
+  } catch (error) {
+    if (backendUrl === DEFAULT_BACKEND_URL && isNetworkError(error)) {
+      return requestTranslation(LOCAL_BACKEND_URL, text, direction, mode, translationStr, signal);
+    }
+    throw error;
+  }
+}
+
+async function getBackendUrl() {
+  const result = await chrome.storage.local.get("backendUrl");
+  return normalizeBackendUrl(result.backendUrl) || DEFAULT_BACKEND_URL;
+}
+
+function normalizeBackendUrl(value) {
+  if (!value || typeof value !== "string") return "";
+  const url = value.trim().replace(/\/+$/, "");
+  if (!/^https?:\/\//i.test(url)) return "";
+  return url.endsWith("/api/translate") ? url : `${url}/api/translate`;
+}
+
+async function requestTranslation(url, text, direction, mode, translationStr, signal) {
+  const response = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text, direction, mode, translation: translationStr }),
     signal,
   });
 
-  const json = await response.json();
+  const json = await readJsonResponse(response);
   if (!response.ok || !json.success) {
     throw new Error(json?.error?.message || "Không thể dịch lúc này. Vui lòng thử lại.");
   }
   return json.data;
+}
+
+async function readJsonResponse(response) {
+  const text = await response.text();
+  if (!text) return {};
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error("Backend trả về dữ liệu không hợp lệ. Vui lòng kiểm tra lại endpoint.");
+  }
+}
+
+function isNetworkError(error) {
+  return error instanceof TypeError || /failed to fetch|network/i.test(error?.message || "");
 }
 
 chrome.runtime.onConnect.addListener((port) => {

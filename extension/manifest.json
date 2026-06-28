@@ -5,6 +5,7 @@
   "description": "Bôi đen từ để dịch ngay. Hỗ trợ EN↔VI, tốc độ cao, hoạt động trên mọi web và PDF.",
   "permissions": ["storage", "tabs", "webNavigation"],
   "host_permissions": [
+    "http://localhost:3000/*",
     "https://quick-viet-translator-backend.onrender.com/*",
     "<all_urls>"
   ],
@@ -22,9 +23,24 @@
   "action": {
     "default_popup": "popup.html"
   },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
   "web_accessible_resources": [
     {
-      "resources": ["pdf.js/*"],
+      "resources": [
+        "pdf.js/build/*",
+        "pdf.js/web/*",
+        "pdf.js/web/cmaps/*",
+        "pdf.js/web/images/*",
+        "pdf.js/web/locale/*",
+        "pdf.js/web/locale/*/*",
+        "pdf.js/web/standard_fonts/*",
+        "content.js",
+        "styles.css"
+      ],
       "matches": ["<all_urls>"]
     }
   ]

@@ -14,6 +14,8 @@ export const errorMiddleware = (error, req, res, next) => {
       message:
         statusCode === 429
           ? "Quá nhiều yêu cầu. Vui lòng thử lại sau."
+          : statusCode === 503
+          ? error.message || "Backend chưa sẵn sàng. Vui lòng thử lại sau."
           : "Không thể dịch lúc này. Vui lòng thử lại.",
     },
   });

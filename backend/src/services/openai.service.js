@@ -1,8 +1,22 @@
 import OpenAI from "openai";
 
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+let client;
+
+const getClient = () => {
+  if (!process.env.OPENAI_API_KEY) {
+    const error = new Error("Backend chưa cấu hình OPENAI_API_KEY.");
+    error.statusCode = 503;
+    throw error;
+  }
+
+  if (!client) {
+    client = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+  }
+
+  return client;
+};
 
 export const translateQuick = async (text, direction = "en-vi") => {
   const system = direction === "vi-en" 
@@ -11,7 +25,7 @@ export const translateQuick = async (text, direction = "en-vi") => {
   
   const userPrompt = `"${text}"`;
 
-  const response = await client.chat.completions.create({
+  const response = await getClient().chat.completions.create({
     model: "gpt-4o-mini",
     messages: [
       { role: "system", content: system },
@@ -33,7 +47,7 @@ Provide explanation and example in valid JSON only:
 Provide explanation and example in valid JSON only:
 {"explanation":"(Short Vietnamese explanation)","example":"(English example sentence)","example_vi":"(Vietnamese translation of the example)"}`;
 
-  const response = await client.chat.completions.create({
+  const response = await getClient().chat.completions.create({
     model: "gpt-4o-mini",
     messages: [
       { role: "system", content: system },

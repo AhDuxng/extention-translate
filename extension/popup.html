@@ -258,6 +258,29 @@
       transform: none;
     }
 
+    .backend-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .backend-input {
+      min-width: 0;
+      flex: 1;
+      height: 28px;
+      border: 1px solid #1f2937;
+      border-radius: 6px;
+      background: #111827;
+      color: #cbd5e1;
+      font-size: 11px;
+      padding: 0 8px;
+      outline: none;
+    }
+
+    .backend-input:focus {
+      border-color: #4f46e5;
+    }
+
     .popup-footer {
       padding: 9px 16px;
       background: rgba(0, 0, 0, 0.25);
@@ -323,8 +346,16 @@
     </div>
   </div>
 
+  <div class="popup-section">
+    <div class="section-label">Backend</div>
+    <div class="backend-row">
+      <input class="backend-input" id="backend-url" type="url" spellcheck="false" />
+      <button class="btn-clear" id="btn-save-backend">Lưu</button>
+    </div>
+  </div>
+
   <div class="popup-footer">
-    <p>Backend: <code>localhost:3000</code> · Không lưu API key</p>
+    <p>Không lưu API key trong extension</p>
   </div>
 
   <script src="popup.js"></script>
