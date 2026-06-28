@@ -20,8 +20,19 @@ const getClient = () => {
 
 export const translateQuick = async (text, direction = "en-vi") => {
   const system = direction === "vi-en" 
-    ? `Translate Vietnamese to English. Return valid JSON only: {"translation":"...","type":"noun|verb|adjective|phrase"}`
-    : `Translate English to Vietnamese. Return valid JSON only: {"translation":"...","type":"noun|verb|adjective|phrase|technical"}`;
+    ? `You are a senior translator for computer science and information technology research papers.
+Translate Vietnamese to precise academic English for IT/CS papers.
+Preserve technical meaning, acronyms, algorithm names, dataset names, model names, citations, formulas, code identifiers, units, and variable names.
+Prefer standard research-paper terminology over casual wording. Do not add information.
+Return valid JSON only:
+{"translation":"...","type":"term|acronym|phrase|sentence|technical expression"}`
+    : `You are a senior translator for computer science and information technology research papers.
+Translate English to precise academic Vietnamese for IT/CS papers.
+Preserve standard technical terms when they are commonly used in English in Vietnamese papers, e.g. API, cache, embedding, pipeline, framework, benchmark, dataset, transformer.
+Preserve acronyms, algorithm names, dataset names, model names, citations, formulas, code identifiers, units, and variable names.
+Use concise, natural Vietnamese suitable for reading academic papers. Do not add information.
+Return valid JSON only:
+{"translation":"...","type":"term|acronym|phrase|sentence|technical expression"}`;
   
   const userPrompt = `"${text}"`;
 
@@ -31,7 +42,7 @@ export const translateQuick = async (text, direction = "en-vi") => {
       { role: "system", content: system },
       { role: "user", content: userPrompt },
     ],
-    max_tokens: 50, // siêu ngắn, siêu nhanh
+    max_tokens: 160,
     temperature: 0.1,
   });
 
@@ -40,12 +51,16 @@ export const translateQuick = async (text, direction = "en-vi") => {
 
 export const translateDetails = async (text, direction = "en-vi", translation = "") => {
   const system = direction === "vi-en"
-    ? `You are an English teacher. The user translated Vietnamese "${text}" to English "${translation}". 
-Provide explanation and example in valid JSON only:
-{"explanation":"(Short English explanation)","example":"(English example sentence)"}`
-    : `You are an English teacher. The user translated English "${text}" to Vietnamese "${translation}". 
-Provide explanation and example in valid JSON only:
-{"explanation":"(Short Vietnamese explanation)","example":"(English example sentence)","example_vi":"(Vietnamese translation of the example)"}`;
+    ? `You are a computer science paper translator.
+The Vietnamese source is "${text}" and the English translation is "${translation}".
+Explain briefly why the translation fits an IT/CS research-paper context. Mention key terminology only when useful.
+Return valid JSON only:
+{"explanation":"(Brief explanation in English)","example":"(Academic English example sentence using the term naturally)"}`
+    : `You are a computer science paper translator.
+The English source is "${text}" and the Vietnamese translation is "${translation}".
+Explain briefly in Vietnamese why this wording fits an IT/CS research-paper context. Mention key terminology only when useful.
+Return valid JSON only:
+{"explanation":"(Giải thích ngắn bằng tiếng Việt)","example":"(Academic English example sentence using the term naturally)","example_vi":"(Bản dịch tiếng Việt của example)"}`;
 
   const response = await getClient().chat.completions.create({
     model: "gpt-4o-mini",
@@ -53,7 +68,7 @@ Provide explanation and example in valid JSON only:
       { role: "system", content: system },
       { role: "user", content: `Please provide details.` },
     ],
-    max_tokens: 250,
+    max_tokens: 360,
     temperature: 0.2,
   });
 

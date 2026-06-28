@@ -10,8 +10,13 @@
     return;
   }
 
+  if (globalThis.__quickVietTranslatorInitialized) {
+    return;
+  }
+  globalThis.__quickVietTranslatorInitialized = true;
+
   const POPUP_ID = "quick-viet-popup";
-  const MAX_LENGTH = 200;
+  const MAX_LENGTH = 800;
   const VI_CHARS = /[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđÀÁẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÈÉẺẼẸÊẾỀỂỄỆÌÍỈĨỊÒÓỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÙÚỦŨỤƯỨỪỬỮỰỲÝỶỸỴĐ]/u;
   const ANY_LETTER = /[a-zA-Zàáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/ui;
 
@@ -110,9 +115,9 @@
     const popup = getOrCreatePopup();
     popup.innerHTML = `
       <div class="qvt-header">
-        <span class="qvt-logo">🔤 Quick Viet</span>
+        <span class="qvt-logo">Quick Viet</span>
         <span class="qvt-dir-badge">${dirLabel(direction)}</span>
-        <button class="qvt-close" title="Đóng">✕</button>
+        <button class="qvt-close" title="Đóng">Đóng</button>
       </div>
       <div class="qvt-loading">
         <div class="qvt-dots"><span></span><span></span><span></span></div>
@@ -130,16 +135,16 @@
 
     popup.innerHTML = `
       <div class="qvt-header">
-        <span class="qvt-logo">🔤 Quick Viet</span>
+        <span class="qvt-logo">Quick Viet</span>
         <span class="qvt-dir-badge">${dirLabel(direction)}</span>
-        <button class="qvt-close" title="Đóng">✕</button>
+        <button class="qvt-close" title="Đóng">Đóng</button>
       </div>
       <div class="qvt-body">
         <div class="qvt-original qvt-appear">${escapeHtml(data.original)}</div>
         <div class="qvt-type qvt-appear">${escapeHtml(data.type || "")}</div>
         <div class="qvt-translation-row qvt-appear">
           <span class="qvt-translation">${escapeHtml(data.translation)}</span>
-          <button class="qvt-copy" title="Copy" data-copy="${escapeHtml(data.translation)}">📋</button>
+          <button class="qvt-copy" title="Copy" data-copy="${escapeHtml(data.translation)}">Copy</button>
         </div>
         <div id="qvt-explanation-slot" class="qvt-fetching-details">
            <div class="qvt-dots"><span></span><span></span><span></span></div>
@@ -187,7 +192,7 @@
     const popup = document.getElementById(POPUP_ID);
     if (popup && data.fromCache) {
       const body = popup.querySelector(".qvt-body");
-      if (body) body.insertAdjacentHTML('beforeend', '<div class="qvt-cache-badge">⚡ Cache</div>');
+      if (body) body.insertAdjacentHTML('beforeend', '<div class="qvt-cache-badge">Cache</div>');
     }
   }
 
@@ -196,10 +201,10 @@
     if (!popup) return;
     popup.innerHTML = `
       <div class="qvt-header">
-        <span class="qvt-logo">🔤 Quick Viet</span>
-        <button class="qvt-close" title="Đóng">✕</button>
+        <span class="qvt-logo">Quick Viet</span>
+        <button class="qvt-close" title="Đóng">Đóng</button>
       </div>
-      <div class="qvt-error">⚠️ ${escapeHtml(message || "Không thể dịch. Vui lòng thử lại.")}</div>
+      <div class="qvt-error">${escapeHtml(message || "Không thể dịch. Vui lòng thử lại.")}</div>
     `;
     popup.querySelector(".qvt-close").addEventListener("click", removePopup);
   }
@@ -209,8 +214,8 @@
     if (!btn) return;
     btn.addEventListener("click", () => {
       navigator.clipboard.writeText(btn.dataset.copy).then(() => {
-        btn.textContent = "✅";
-        setTimeout(() => (btn.textContent = "📋"), 1500);
+        btn.textContent = "Đã copy";
+        setTimeout(() => (btn.textContent = "Copy"), 1500);
       });
     });
   }

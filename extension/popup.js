@@ -81,12 +81,12 @@ btnSaveBackend.addEventListener("click", () => {
   const backendUrl = toBackendBase(backendUrlEl.value);
 
   if (!/^https?:\/\//i.test(backendUrl)) {
-    showFeedback(btnSaveBackend, "URL sai", "!");
+    showFeedback(btnSaveBackend, "URL sai");
     return;
   }
 
   chrome.storage.local.set({ backendUrl }, () => {
-    showFeedback(btnSaveBackend, "Đã lưu", "OK");
+    showFeedback(btnSaveBackend, "Đã lưu");
   });
 });
 
@@ -104,20 +104,20 @@ btnClearCache.addEventListener("click", () => {
     );
 
     if (keysToRemove.length === 0) {
-      showFeedback(btnClearCache, "Trống rồi!", "🗒️");
+      showFeedback(btnClearCache, "Cache trống");
       return;
     }
 
     chrome.storage.local.remove(keysToRemove, () => {
       refreshCacheCount();
-      showFeedback(btnClearCache, "Đã xóa!", "✅");
+      showFeedback(btnClearCache, "Đã xóa");
     });
   });
 });
 
-function showFeedback(btn, message, icon) {
+function showFeedback(btn, message) {
   const originalText = btn.textContent;
-  btn.textContent = `${icon} ${message}`;
+  btn.textContent = message;
   btn.disabled = true;
   setTimeout(() => {
     btn.textContent = originalText;

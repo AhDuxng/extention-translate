@@ -3,6 +3,46 @@
 const DEFAULT_BACKEND_URL = "https://quick-viet-translator-backend.onrender.com/api/translate";
 const LOCAL_BACKEND_URL = "http://localhost:3000/api/translate";
 const EXTENSION_ORIGIN = chrome.runtime.getURL("");
+const INJECTABLE_PROTOCOLS = new Set(["http:", "https:", "file:"]);
+const TRANSLATE_TIMEOUT_MS = 12000;
+
+chrome.runtime.onInstalled.addListener(() => {
+  injectIntoExistingTabs().catch(() => {});
+});
+
+chrome.runtime.onStartup.addListener(() => {
+  injectIntoExistingTabs().catch(() => {});
+});
+
+async function injectIntoExistingTabs() {
+  if (!chrome.scripting) return;
+
+  const tabs = await chrome.tabs.query({});
+  await Promise.allSettled(
+    tabs
+      .filter((tab) => tab.id && canInjectIntoUrl(tab.url))
+      .map(async (tab) => {
+        await chrome.scripting.insertCSS({
+          target: { tabId: tab.id, allFrames: true },
+          files: ["styles.css"],
+        });
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id, allFrames: true },
+          files: ["content.js"],
+        });
+      })
+  );
+}
+
+function canInjectIntoUrl(rawUrl) {
+  if (!rawUrl) return false;
+  try {
+    const url = new URL(rawUrl);
+    return INJECTABLE_PROTOCOLS.has(url.protocol);
+  } catch {
+    return false;
+  }
+}
 
 // --- PDF.js Intercept ---
 chrome.webNavigation.onBeforeNavigate.addListener((details) => {
@@ -47,7 +87,7 @@ async function translateMode(text, direction, mode, translationStr = "", signal)
   try {
     return await requestTranslation(backendUrl, text, direction, mode, translationStr, signal);
   } catch (error) {
-    if (backendUrl === DEFAULT_BACKEND_URL && isNetworkError(error)) {
+    if (backendUrl === DEFAULT_BACKEND_URL && isRetryableBackendError(error)) {
       return requestTranslation(LOCAL_BACKEND_URL, text, direction, mode, translationStr, signal);
     }
     throw error;
@@ -67,12 +107,30 @@ function normalizeBackendUrl(value) {
 }
 
 async function requestTranslation(url, text, direction, mode, translationStr, signal) {
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, direction, mode, translation: translationStr }),
-    signal,
-  });
+  const timeoutController = new AbortController();
+  const unlinkAbortSignal = linkAbortSignal(signal, timeoutController);
+  const timeoutId = setTimeout(() => {
+    timeoutController.abort(new Error("Backend phản hồi quá lâu. Vui lòng kiểm tra lại server."));
+  }, TRANSLATE_TIMEOUT_MS);
+
+  let response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, direction, mode, translation: translationStr }),
+      signal: timeoutController.signal,
+    });
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    if (timeoutController.signal.aborted) {
+      throw timeoutController.signal.reason || new Error("Backend phản hồi quá lâu. Vui lòng kiểm tra lại server.");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+    unlinkAbortSignal();
+  }
 
   const json = await readJsonResponse(response);
   if (!response.ok || !json.success) {
@@ -92,8 +150,20 @@ async function readJsonResponse(response) {
   }
 }
 
-function isNetworkError(error) {
-  return error instanceof TypeError || /failed to fetch|network/i.test(error?.message || "");
+function linkAbortSignal(sourceSignal, targetController) {
+  if (!sourceSignal) return () => {};
+  if (sourceSignal.aborted) {
+    targetController.abort(sourceSignal.reason);
+    return () => {};
+  }
+
+  const abort = () => targetController.abort(sourceSignal.reason);
+  sourceSignal.addEventListener("abort", abort, { once: true });
+  return () => sourceSignal.removeEventListener("abort", abort);
+}
+
+function isRetryableBackendError(error) {
+  return error instanceof TypeError || /failed to fetch|network|phản hồi quá lâu/i.test(error?.message || "");
 }
 
 chrome.runtime.onConnect.addListener((port) => {

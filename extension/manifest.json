@@ -3,7 +3,7 @@
   "name": "Quick Viet Translator",
   "version": "1.2.0",
   "description": "Bôi đen từ để dịch ngay. Hỗ trợ EN↔VI, tốc độ cao, hoạt động trên mọi web và PDF.",
-  "permissions": ["storage", "tabs", "webNavigation"],
+  "permissions": ["storage", "tabs", "webNavigation", "scripting"],
   "host_permissions": [
     "http://localhost:3000/*",
     "https://quick-viet-translator-backend.onrender.com/*",
