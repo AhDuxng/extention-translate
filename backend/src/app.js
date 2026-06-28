@@ -5,6 +5,8 @@ import { errorMiddleware } from "./middlewares/error.middleware.js";
 
 const app = express();
 
+app.set("trust proxy", 1);
+
 const allowedOrigin = process.env.ALLOWED_ORIGIN || "*";
 
 app.use(

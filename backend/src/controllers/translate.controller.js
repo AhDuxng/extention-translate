@@ -30,7 +30,10 @@ export const translateController = async (req, res, next) => {
       res.setHeader("Cache-Control", "no-cache");
       res.setHeader("Connection", "keep-alive");
       res.setHeader("X-Accel-Buffering", "no");
+      res.socket?.setTimeout(0);
       res.flushHeaders();
+
+      res.write(": connected\n\n");
 
       await translateWithOpenAIStream(text, direction, ({ type, key, value, data }) => {
         if (type === "field") {
