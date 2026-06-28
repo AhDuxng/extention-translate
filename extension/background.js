@@ -1,6 +1,6 @@
 "use strict";
 
-const BACKEND_URL = "http://localhost:3000/api/translate";
+const BACKEND_URL = "https://quick-viet-translator-backend.onrender.com/api/translate";
 
 async function getCachedTranslation(text, direction) {
   const key = `${direction}:${text.toLowerCase().trim()}`;

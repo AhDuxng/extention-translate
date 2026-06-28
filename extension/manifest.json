@@ -5,8 +5,7 @@
   "description": "Bôi đen từ tiếng Anh bất kỳ để dịch sang tiếng Việt ngay lập tức.",
   "permissions": ["storage"],
   "host_permissions": [
-    "http://localhost:3000/*",
-    "https://your-backend-domain.com/*"
+    "https://quick-viet-translator-backend.onrender.com/*"
   ],
   "background": {
     "service_worker": "background.js"
