@@ -10,7 +10,6 @@
   let isEnabled = true;
   let currentDirection = "auto";
   let currentPort = null;
-  let streamState = null;
 
   chrome.storage.local.get(["enabled", "direction"], (result) => {
     if (result.enabled === false) isEnabled = false;
@@ -27,13 +26,9 @@
     }
   });
 
-  function detectLanguage(text) {
-    return VI_CHARS.test(text) ? "vi" : "en";
-  }
-
   function resolveDirection(text) {
     if (currentDirection === "auto") {
-      return detectLanguage(text) === "vi" ? "vi-en" : "en-vi";
+      return VI_CHARS.test(text) ? "vi-en" : "en-vi";
     }
     return currentDirection;
   }
@@ -57,12 +52,11 @@
     disconnectPort();
     const popup = document.getElementById(POPUP_ID);
     if (popup) popup.remove();
-    streamState = null;
   }
 
   function disconnectPort() {
     if (currentPort) {
-      try { currentPort.disconnect(); } catch { }
+      try { currentPort.disconnect(); } catch {}
       currentPort = null;
     }
   }
@@ -103,6 +97,10 @@
       .replace(/'/g, "&#039;");
   }
 
+  function delay(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
   function showLoadingPopup(rect, direction) {
     const popup = getOrCreatePopup();
     popup.innerHTML = `
@@ -121,128 +119,58 @@
     popup.querySelector(".qvt-close").addEventListener("click", removePopup);
   }
 
-  function applyField(key, value, direction) {
+  async function renderProgressiveReveal(data, direction) {
     const popup = document.getElementById(POPUP_ID);
     if (!popup) return;
 
-    if (key === "translation") {
-      const loading = popup.querySelector(".qvt-loading");
-      if (loading) {
-        loading.outerHTML = `
-          <div class="qvt-body">
-            <div class="qvt-original"></div>
-            <div class="qvt-type"></div>
-            <div class="qvt-translation-row">
-              <span class="qvt-translation qvt-appear">${escapeHtml(value)}</span>
-              <button class="qvt-copy" title="Copy" data-copy="${escapeHtml(value)}">📋</button>
-            </div>
-            <div class="qvt-explanation"></div>
-            <div class="qvt-example-block" style="display:none"></div>
-          </div>
-        `;
-        setupCopyButton(popup);
-      } else {
-        const el = popup.querySelector(".qvt-translation");
-        if (el) {
-          el.textContent = value;
-          const copyBtn = popup.querySelector(".qvt-copy");
-          if (copyBtn) copyBtn.dataset.copy = value;
-        }
+    popup.innerHTML = `
+      <div class="qvt-header">
+        <span class="qvt-logo">🔤 Quick Viet</span>
+        <span class="qvt-dir-badge">${dirLabel(direction)}</span>
+        <button class="qvt-close" title="Đóng">✕</button>
+      </div>
+      <div class="qvt-body">
+        <div class="qvt-original qvt-appear">${escapeHtml(data.original)}</div>
+        <div class="qvt-type qvt-appear">${escapeHtml(data.type || "")}</div>
+        <div class="qvt-translation-row qvt-appear">
+          <span class="qvt-translation">${escapeHtml(data.translation)}</span>
+          <button class="qvt-copy" title="Copy" data-copy="${escapeHtml(data.translation)}">📋</button>
+        </div>
+        <div id="qvt-explanation-slot"></div>
+        <div id="qvt-example-slot"></div>
+        ${data.fromCache ? '<div class="qvt-cache-badge">⚡ Cache</div>' : ""}
+      </div>
+    `;
+
+    popup.querySelector(".qvt-close").addEventListener("click", removePopup);
+    setupCopyButton(popup);
+
+    if (data.explanation) {
+      await delay(180);
+      const slot = document.getElementById("qvt-explanation-slot");
+      if (slot) {
+        const el = document.createElement("div");
+        el.className = "qvt-explanation qvt-appear";
+        el.textContent = data.explanation;
+        slot.replaceWith(el);
       }
-    } else if (key === "original") {
-      const el = popup.querySelector(".qvt-original");
-      if (el) el.textContent = value;
-    } else if (key === "type") {
-      const el = popup.querySelector(".qvt-type");
-      if (el) el.textContent = value;
-    } else if (key === "explanation") {
-      const el = popup.querySelector(".qvt-explanation");
-      if (el) {
-        el.textContent = value;
-        el.classList.add("qvt-appear");
-      }
-    } else if (key === "example") {
-      const block = popup.querySelector(".qvt-example-block");
-      if (block) {
+    }
+
+    if (data.example) {
+      await delay(160);
+      const slot = document.getElementById("qvt-example-slot");
+      if (slot) {
         const label = direction === "vi-en" ? "Example" : "Ví dụ";
-        block.style.display = "block";
+        const block = document.createElement("div");
+        block.className = "qvt-example-block qvt-appear";
         block.innerHTML = `
           <div class="qvt-example-label">${label}</div>
-          <div class="qvt-example qvt-appear">${escapeHtml(value)}</div>
-          <div class="qvt-example-vi"></div>
+          <div class="qvt-example">${escapeHtml(data.example)}</div>
+          ${data.example_vi ? `<div class="qvt-example-vi">${escapeHtml(data.example_vi)}</div>` : ""}
         `;
-      }
-    } else if (key === "example_vi") {
-      const el = popup.querySelector(".qvt-example-vi");
-      if (el) {
-        el.textContent = value;
-        el.classList.add("qvt-appear");
+        slot.replaceWith(block);
       }
     }
-  }
-
-  function renderFullTranslation(data, direction) {
-    const popup = document.getElementById(POPUP_ID);
-    if (!popup) return;
-
-    const exampleSection = data.example ? `
-      <div class="qvt-example-block">
-        <div class="qvt-example-label">${direction === "vi-en" ? "Example" : "Ví dụ"}</div>
-        <div class="qvt-example">${escapeHtml(data.example)}</div>
-        ${data.example_vi ? `<div class="qvt-example-vi">${escapeHtml(data.example_vi)}</div>` : ""}
-      </div>
-    ` : "";
-
-    const header = popup.querySelector(".qvt-header");
-    if (header) {
-      const body = popup.querySelector(".qvt-body");
-      if (body) {
-        body.innerHTML = `
-          <div class="qvt-original">${escapeHtml(data.original)}</div>
-          <div class="qvt-type">${escapeHtml(data.type || "")}</div>
-          <div class="qvt-translation-row">
-            <span class="qvt-translation">${escapeHtml(data.translation)}</span>
-            <button class="qvt-copy" title="Copy" data-copy="${escapeHtml(data.translation)}">📋</button>
-          </div>
-          <div class="qvt-explanation">${escapeHtml(data.explanation || "")}</div>
-          ${exampleSection}
-          ${data.fromCache ? '<div class="qvt-cache-badge">⚡ Cache</div>' : ""}
-        `;
-        setupCopyButton(popup);
-      }
-    } else {
-      popup.innerHTML = `
-        <div class="qvt-header">
-          <span class="qvt-logo">Quick Viet</span>
-          <span class="qvt-dir-badge">${dirLabel(direction)}</span>
-          <button class="qvt-close" title="Đóng">✕</button>
-        </div>
-        <div class="qvt-body">
-          <div class="qvt-original">${escapeHtml(data.original)}</div>
-          <div class="qvt-type">${escapeHtml(data.type || "")}</div>
-          <div class="qvt-translation-row">
-            <span class="qvt-translation">${escapeHtml(data.translation)}</span>
-            <button class="qvt-copy" title="Copy" data-copy="${escapeHtml(data.translation)}">📋</button>
-          </div>
-          <div class="qvt-explanation">${escapeHtml(data.explanation || "")}</div>
-          ${exampleSection}
-          ${data.fromCache ? '<div class="qvt-cache-badge">⚡ Cache</div>' : ""}
-        </div>
-      `;
-      popup.querySelector(".qvt-close").addEventListener("click", removePopup);
-      setupCopyButton(popup);
-    }
-  }
-
-  function setupCopyButton(popup) {
-    const btn = popup.querySelector(".qvt-copy");
-    if (!btn) return;
-    btn.addEventListener("click", () => {
-      navigator.clipboard.writeText(btn.dataset.copy).then(() => {
-        btn.textContent = "✔";
-        setTimeout(() => (btn.textContent = "📋"), 1500);
-      });
-    });
   }
 
   function renderError(message) {
@@ -250,12 +178,23 @@
     if (!popup) return;
     popup.innerHTML = `
       <div class="qvt-header">
-        <span class="qvt-logo">Quick Viet</span>
+        <span class="qvt-logo">🔤 Quick Viet</span>
         <button class="qvt-close" title="Đóng">✕</button>
       </div>
       <div class="qvt-error">⚠️ ${escapeHtml(message || "Không thể dịch. Vui lòng thử lại.")}</div>
     `;
     popup.querySelector(".qvt-close").addEventListener("click", removePopup);
+  }
+
+  function setupCopyButton(popup) {
+    const btn = popup.querySelector(".qvt-copy");
+    if (!btn) return;
+    btn.addEventListener("click", () => {
+      navigator.clipboard.writeText(btn.dataset.copy).then(() => {
+        btn.textContent = "✅";
+        setTimeout(() => (btn.textContent = "📋"), 1500);
+      });
+    });
   }
 
   async function handleSelection() {
@@ -274,20 +213,14 @@
 
     const port = chrome.runtime.connect({ name: "translation-stream" });
     currentPort = port;
-    streamState = { direction };
 
     port.onMessage.addListener((message) => {
-      const dir = streamState?.direction || "en-vi";
-      if (message.type === "field") {
-        applyField(message.key, message.value, dir);
-      } else if (message.type === "done") {
-        renderFullTranslation(message.data, dir);
+      if (message.type === "done") {
+        renderProgressiveReveal(message.data, direction);
         disconnectPort();
-        streamState = null;
       } else if (message.type === "error") {
         renderError(message.message);
         disconnectPort();
-        streamState = null;
       }
     });
 

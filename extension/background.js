@@ -13,7 +13,7 @@ async function setCachedTranslation(text, direction, data) {
   await chrome.storage.local.set({ [key]: { ...data, cachedAt: Date.now() } });
 }
 
-async function streamTranslation(text, direction, port, signal) {
+async function translate(text, direction, port, signal) {
   const cached = await getCachedTranslation(text, direction);
   if (cached) {
     port.postMessage({ type: "done", data: { ...cached, fromCache: true } });
@@ -24,50 +24,18 @@ async function streamTranslation(text, direction, port, signal) {
     const response = await fetch(BACKEND_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, direction, stream: true }),
+      body: JSON.stringify({ text, direction }),
       signal,
     });
 
-    if (!response.ok) {
-      const errJson = await response.json().catch(() => ({}));
-      throw new Error(errJson?.error?.message || "Không thể kết nối backend.");
+    const json = await response.json();
+
+    if (!response.ok || !json.success) {
+      throw new Error(json?.error?.message || "Không thể dịch lúc này. Vui lòng thử lại.");
     }
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    let finalData = null;
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop();
-
-      for (const line of lines) {
-        if (!line.startsWith("data: ")) continue;
-        const raw = line.slice(6).trim();
-        if (raw === "[DONE]") break;
-
-        try {
-          const event = JSON.parse(raw);
-          if (event.type === "field") {
-            port.postMessage({ type: "field", key: event.key, value: event.value });
-          } else if (event.type === "done") {
-            finalData = event.data;
-            port.postMessage({ type: "done", data: event.data });
-          } else if (event.type === "error") {
-            port.postMessage({ type: "error", message: event.message });
-          }
-        } catch {}
-      }
-    }
-
-    if (finalData) {
-      await setCachedTranslation(text, direction, finalData);
-    }
+    await setCachedTranslation(text, direction, json.data);
+    port.postMessage({ type: "done", data: json.data });
   } catch (error) {
     if (error.name === "AbortError") return;
     port.postMessage({ type: "error", message: error.message || "Lỗi không xác định." });
@@ -83,7 +51,7 @@ chrome.runtime.onConnect.addListener((port) => {
     if (message.type === "TRANSLATE_STREAM") {
       if (abortController) abortController.abort();
       abortController = new AbortController();
-      await streamTranslation(message.text, message.direction, port, abortController.signal);
+      await translate(message.text, message.direction, port, abortController.signal);
     }
   });
 
