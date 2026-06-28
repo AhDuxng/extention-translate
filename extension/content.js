@@ -1,6 +1,15 @@
 (function () {
   "use strict";
 
+  if (
+    typeof chrome === "undefined" ||
+    !chrome.runtime?.connect ||
+    !chrome.runtime?.onMessage ||
+    !chrome.storage?.local
+  ) {
+    return;
+  }
+
   const POPUP_ID = "quick-viet-popup";
   const MAX_LENGTH = 200;
   const VI_CHARS = /[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđÀÁẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÈÉẺẼẸÊẾỀỂỄỆÌÍỈĨỊÒÓỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÙÚỦŨỤƯỨỪỬỮỰỲÝỶỸỴĐ]/u;

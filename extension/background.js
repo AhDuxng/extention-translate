@@ -100,6 +100,17 @@ chrome.runtime.onConnect.addListener((port) => {
   if (port.name !== "translation-stream") return;
 
   let abortController = null;
+  let isDisconnected = false;
+
+  function safePostMessage(message) {
+    if (isDisconnected) return false;
+    try {
+      port.postMessage(message);
+      return true;
+    } catch {
+      return false;
+    }
+  }
 
   port.onMessage.addListener(async (message) => {
     if (message.type === "TRANSLATE_QUICK") {
@@ -111,14 +122,14 @@ chrome.runtime.onConnect.addListener((port) => {
       // Kiểm tra cache (nếu đã cache full thì gửi thẳng full luôn)
       const cached = await getCachedTranslation(text, direction);
       if (cached && cached.explanation) {
-        port.postMessage({ type: "done_full", data: { ...cached, fromCache: true } });
+        safePostMessage({ type: "done_full", data: { ...cached, fromCache: true } });
         return;
       }
 
       try {
         // Bước 1: Quick
         const quickData = await translateMode(text, direction, "quick", "", abortController.signal);
-        port.postMessage({ type: "done_quick", data: quickData });
+        if (!safePostMessage({ type: "done_quick", data: quickData })) return;
 
         // Bước 2: Details
         const detailsData = await translateMode(text, direction, "details", quickData.translation, abortController.signal);
@@ -126,16 +137,17 @@ chrome.runtime.onConnect.addListener((port) => {
         const fullData = { ...quickData, ...detailsData };
         await setCachedTranslation(text, direction, fullData);
         
-        port.postMessage({ type: "done_details", data: fullData });
+        safePostMessage({ type: "done_details", data: fullData });
 
       } catch (error) {
         if (error.name === "AbortError") return;
-        port.postMessage({ type: "error", message: error.message || "Lỗi không xác định." });
+        safePostMessage({ type: "error", message: error.message || "Lỗi không xác định." });
       }
     }
   });
 
   port.onDisconnect.addListener(() => {
+    isDisconnected = true;
     if (abortController) abortController.abort();
     abortController = null;
   });
