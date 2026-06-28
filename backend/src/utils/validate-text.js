@@ -9,7 +9,7 @@ export const isProbablyEnglishText = (text) => {
   if (typeof text !== "string") return false;
   const trimmed = text.trim();
   if (!trimmed) return false;
-  if (trimmed.length > 800) return false;
+  if (trimmed.length > 1500) return false;
   return /[a-zA-Z]/.test(trimmed);
 };
 
@@ -17,7 +17,7 @@ export const isValidTextForTranslation = (text) => {
   if (typeof text !== "string") return false;
   const trimmed = text.trim();
   if (!trimmed || trimmed.length < 1) return false;
-  if (trimmed.length > 800) return false;
+  if (trimmed.length > 1500) return false;
   return /[a-zA-ZàáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđÀÁẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÈÉẺẼẸÊẾỀỂỄỆÌÍỈĨỊÒÓỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÙÚỦŨỤƯỨỪỬỮỰỲÝỶỸỴĐ]/u.test(trimmed);
 };
 

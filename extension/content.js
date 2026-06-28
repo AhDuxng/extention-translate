@@ -16,14 +16,18 @@
   globalThis.__quickVietTranslatorInitialized = true;
 
   const POPUP_ID = "quick-viet-popup";
-  const MAX_LENGTH = 800;
+  const MAX_LENGTH = 1500;
   const VI_CHARS = /[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđÀÁẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÈÉẺẼẸÊẾỀỂỄỆÌÍỈĨỊÒÓỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÙÚỦŨỤƯỨỪỬỮỰỲÝỶỸỴĐ]/u;
   const ANY_LETTER = /[a-zA-Zàáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/ui;
+  const TEXT_INPUT_TYPES = new Set(["", "email", "number", "password", "search", "tel", "text", "url"]);
 
   let selectionTimer = null;
   let isEnabled = true;
   let currentDirection = "auto";
   let currentPort = null;
+  let activeAnchorRect = null;
+  let lastRequestKey = "";
+  let lastSelectionSnapshot = null;
 
   chrome.storage.local.get(["enabled", "direction"], (result) => {
     if (result.enabled === false) isEnabled = false;
@@ -47,9 +51,12 @@
     return currentDirection;
   }
 
+  function normalizeSelectionText(text) {
+    return String(text || "").replace(/\s+/g, " ").trim();
+  }
+
   function isValidSelection(text) {
-    if (!text || text.length < 1 || text.length > MAX_LENGTH) return false;
-    return ANY_LETTER.test(text);
+    return !!text && text.length <= MAX_LENGTH && ANY_LETTER.test(text);
   }
 
   function getOrCreatePopup() {
@@ -64,6 +71,7 @@
 
   function removePopup() {
     disconnectPort();
+    activeAnchorRect = null;
     const popup = document.getElementById(POPUP_ID);
     if (popup) popup.remove();
   }
@@ -79,19 +87,20 @@
     const margin = 10;
     const W = window.innerWidth;
     const H = window.innerHeight;
-    const sx = window.scrollX;
-    const sy = window.scrollY;
 
-    let top = rect.bottom + sy + margin;
-    let left = rect.left + sx;
+    popup.style.maxHeight = `${Math.max(180, H - margin * 2)}px`;
 
-    const pw = 360;
-    const ph = 220;
+    const popupRect = popup.getBoundingClientRect();
+    const pw = Math.min(popupRect.width || 420, W - margin * 2);
+    const ph = Math.min(popupRect.height || 220, H - margin * 2);
 
-    if (left + pw > W + sx) left = W + sx - pw - margin;
-    if (left < sx) left = sx + margin;
-    if (top + ph > H + sy) top = rect.top + sy - ph - margin;
-    if (top < sy) top = sy + margin;
+    let top = rect.bottom + margin;
+    let left = rect.left;
+
+    if (left + pw > W - margin) left = W - pw - margin;
+    if (left < margin) left = margin;
+    if (top + ph > H - margin) top = rect.top - ph - margin;
+    if (top < margin) top = margin;
 
     popup.style.top = `${top}px`;
     popup.style.left = `${left}px`;
@@ -125,6 +134,7 @@
       </div>
     `;
     popup.style.display = "block";
+    activeAnchorRect = rect;
     positionPopup(popup, rect);
     popup.querySelector(".qvt-close").addEventListener("click", removePopup);
   }
@@ -154,6 +164,7 @@
     `;
     popup.querySelector(".qvt-close").addEventListener("click", removePopup);
     setupCopyButton(popup);
+    if (activeAnchorRect) positionPopup(popup, activeAnchorRect);
   }
 
   function renderDetails(data, direction) {
@@ -184,6 +195,8 @@
         slot.replaceWith(block);
       }
     }
+
+    if (activeAnchorRect) positionPopup(popup, activeAnchorRect);
   }
 
   function renderFull(data, direction) {
@@ -207,6 +220,7 @@
       <div class="qvt-error">${escapeHtml(message || "Không thể dịch. Vui lòng thử lại.")}</div>
     `;
     popup.querySelector(".qvt-close").addEventListener("click", removePopup);
+    if (activeAnchorRect) positionPopup(popup, activeAnchorRect);
   }
 
   function setupCopyButton(popup) {
@@ -221,27 +235,85 @@
   }
 
   function getSelectionText() {
+    const currentSelection = readCurrentSelection();
+    if (currentSelection.text && currentSelection.rect) return currentSelection;
+
+    if (lastSelectionSnapshot && Date.now() - lastSelectionSnapshot.createdAt < 1500) {
+      return {
+        text: lastSelectionSnapshot.text,
+        rect: lastSelectionSnapshot.rect,
+      };
+    }
+
+    return currentSelection;
+  }
+
+  function readCurrentSelection() {
     let text = "";
     let rect = null;
 
-    // 1. Trích xuất từ text selection tiêu chuẩn
     const selection = window.getSelection();
     if (selection && selection.toString().trim()) {
-      text = selection.toString().trim();
-      rect = selection.getRangeAt(0).getBoundingClientRect();
+      text = normalizeSelectionText(selection.toString());
+      rect = getRangeRect(selection);
     }
-    // 2. Trích xuất từ thẻ input / textarea
-    else if (document.activeElement && 
-            (document.activeElement.tagName === "TEXTAREA" || 
-             (document.activeElement.tagName === "INPUT" && document.activeElement.type === "text"))) {
+    else if (isSelectableInput(document.activeElement)) {
       const el = document.activeElement;
       if (el.selectionStart !== undefined && el.selectionEnd !== undefined) {
-        text = el.value.substring(el.selectionStart, el.selectionEnd).trim();
-        rect = el.getBoundingClientRect(); // Lấy toạ độ input
+        text = normalizeSelectionText(el.value.substring(el.selectionStart, el.selectionEnd));
+        rect = el.getBoundingClientRect();
       }
     }
 
     return { text, rect };
+  }
+
+  function saveSelectionSnapshot() {
+    const { text, rect } = readCurrentSelection();
+    if (!isValidSelection(text) || !rect) return;
+    lastSelectionSnapshot = { text, rect, createdAt: Date.now() };
+  }
+
+  function isSelectableInput(el) {
+    if (!el) return false;
+    if (el.tagName === "TEXTAREA") return true;
+    return el.tagName === "INPUT" && TEXT_INPUT_TYPES.has((el.type || "").toLowerCase());
+  }
+
+  function getRangeRect(selection) {
+    if (!selection.rangeCount) return null;
+
+    const range = selection.getRangeAt(0);
+    const rect = normalizeRect(range.getBoundingClientRect());
+    if (rect) return rect;
+
+    const rects = Array.from(range.getClientRects()).map(normalizeRect).filter(Boolean);
+    return rects.length ? rects[rects.length - 1] : null;
+  }
+
+  function normalizeRect(rect) {
+    if (!rect) return null;
+    const width = Math.max(rect.width || 0, 1);
+    const height = Math.max(rect.height || 0, 1);
+    if (!Number.isFinite(rect.top) || !Number.isFinite(rect.left)) return null;
+    return {
+      top: rect.top,
+      right: rect.right || rect.left + width,
+      bottom: rect.bottom || rect.top + height,
+      left: rect.left,
+      width,
+      height,
+    };
+  }
+
+  function isInsidePopup(target) {
+    const popup = document.getElementById(POPUP_ID);
+    return !!popup && !!target && popup.contains(target);
+  }
+
+  function scheduleSelectionCheck(delay = 180) {
+    clearTimeout(selectionTimer);
+    selectionTimer = setTimeout(handleSelection, delay);
   }
 
   async function handleSelection() {
@@ -251,6 +323,9 @@
     if (!isValidSelection(text) || !rect) return;
 
     const direction = resolveDirection(text);
+    const requestKey = `${direction}:${text}`;
+    if (requestKey === lastRequestKey && document.getElementById(POPUP_ID)) return;
+    lastRequestKey = requestKey;
 
     showLoadingPopup(rect, direction);
     disconnectPort();
@@ -280,16 +355,30 @@
     port.postMessage({ type: "TRANSLATE_QUICK", text, direction });
   }
 
-  // Sử dụng { capture: true } để đánh chặn sự kiện chuột 
-  // TRƯỚC KHI các trang web phức tạp (Facebook, Google Docs) kịp gọi stopPropagation
-  document.addEventListener("mouseup", () => {
-    clearTimeout(selectionTimer);
-    selectionTimer = setTimeout(handleSelection, 250);
+  document.addEventListener("mouseup", (event) => {
+    if (!isInsidePopup(event.target)) scheduleSelectionCheck(160);
+  }, { capture: true });
+
+  document.addEventListener("pointerup", (event) => {
+    if (!isInsidePopup(event.target)) scheduleSelectionCheck(160);
+  }, { capture: true });
+
+  document.addEventListener("touchend", (event) => {
+    if (!isInsidePopup(event.target)) scheduleSelectionCheck(280);
+  }, { capture: true, passive: true });
+
+  document.addEventListener("keyup", (event) => {
+    if (event.key === "Escape") return;
+    scheduleSelectionCheck(220);
+  }, { capture: true });
+
+  document.addEventListener("selectionchange", () => {
+    saveSelectionSnapshot();
+    scheduleSelectionCheck(520);
   }, { capture: true });
 
   document.addEventListener("mousedown", (e) => {
-    const popup = document.getElementById(POPUP_ID);
-    if (popup && !popup.contains(e.target)) removePopup();
+    if (!isInsidePopup(e.target)) removePopup();
   }, { capture: true });
 
   document.addEventListener("keydown", (e) => {

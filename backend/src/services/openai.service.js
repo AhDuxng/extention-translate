@@ -42,7 +42,7 @@ Return valid JSON only:
       { role: "system", content: system },
       { role: "user", content: userPrompt },
     ],
-    max_tokens: 160,
+    max_tokens: 360,
     temperature: 0.1,
   });
 

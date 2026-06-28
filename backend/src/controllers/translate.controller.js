@@ -7,7 +7,7 @@ const translateSchema = z.object({
     .string({ required_error: "Field 'text' là bắt buộc." })
     .trim()
     .min(1, { message: "Text không được để trống." })
-    .max(800, { message: "Text không được quá 800 ký tự." }),
+    .max(1500, { message: "Text không được quá 1500 ký tự." }),
   direction: z.enum(["en-vi", "vi-en", "auto"]).optional().default("auto"),
   mode: z.enum(["quick", "details"]).optional().default("quick"),
   translation: z.string().optional(), // Dùng cho mode details
