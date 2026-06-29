@@ -234,6 +234,87 @@ Nếu production backend phản hồi quá lâu, extension có timeout 12 giây 
 5. Giải thích và ví dụ sẽ được bổ sung sau.
 6. Dùng nút `Copy` để sao chép bản dịch.
 
+## Mô phỏng luồng hoạt động
+
+### Luồng mở và hiển thị PDF
+
+Luồng này mô phỏng phần extension phát hiện URL PDF, tạo viewer nội bộ bằng PDF.js, rồi cho phép người dùng bôi đen text trong PDF để dịch.
+
+```mermaid
+flowchart TD
+  A[Người dùng mở một URL PDF] --> B{URL có path kết thúc bằng .pdf?}
+  B -- Không --> C[Chrome mở trang theo cách bình thường]
+  B -- Có --> D[background.js nhận sự kiện webNavigation.onBeforeNavigate]
+  D --> E{URL có phải chrome-extension:// không?}
+  E -- Có --> F[Bỏ qua để tránh redirect lặp]
+  E -- Không --> G[Tạo viewer URL bằng chrome.runtime.getURL]
+  G --> H[chrome.tabs.update sang pdf.js/web/viewer.html?file=PDF_URL]
+  H --> I[PDF.js tải file PDF từ tham số file]
+  I --> J[PDF.js render trang PDF, text layer và toolbar]
+  J --> K[content.js và styles.css hoạt động trong viewer]
+  K --> L[Người dùng bôi đen text trong PDF]
+  L --> M[Chạy tiếp luồng dịch chữ bôi đen]
+```
+
+Các điểm bảo vệ trong luồng PDF:
+
+- `background.js` bỏ qua URL thuộc chính extension để tránh redirect vòng lặp.
+- PDF.js được expose trong `web_accessible_resources`.
+- `viewer.mjs` được điều chỉnh để cho phép origin `chrome-extension://`.
+- Với file local, Chrome cần bật `Allow access to file URLs`.
+
+### Luồng dịch chữ bôi đen
+
+Luồng này mô phỏng phần chính của extension: bắt selection trên website/PDF, hiển thị popup, gọi backend, cache và render kết quả.
+
+```mermaid
+flowchart TD
+  A[Người dùng bôi đen text] --> B[content.js bắt sự kiện mouseup/pointerup/touchend/keyup/selectionchange]
+  B --> C[Đọc selection hiện tại]
+  C --> D{Selection còn tồn tại?}
+  D -- Không --> E[Dùng snapshot selection gần nhất nếu còn hợp lệ]
+  D -- Có --> F[Chuẩn hóa text và lấy rect]
+  E --> F
+  F --> G{Text hợp lệ và <= 1500 ký tự?}
+  G -- Không --> H[Bỏ qua, không gọi API]
+  G -- Có --> I[Xác định chiều dịch Auto/EN-VI/VI-EN]
+  I --> J[Hiển thị popup loading gần vùng bôi đen]
+  J --> K[Mở runtime port tới background.js]
+  K --> L[background.js kiểm tra cache theo direction:text]
+  L --> M{Cache đã có bản đầy đủ?}
+  M -- Có --> N[Trả kết quả cache về content.js]
+  M -- Không --> O[Gọi backend mode quick]
+  O --> P[Render bản dịch nhanh]
+  P --> Q[Gọi backend mode details]
+  Q --> R[Lưu cache bản đầy đủ]
+  R --> S[Render giải thích và ví dụ]
+  N --> T[Render bản dịch từ cache]
+```
+
+Luồng lỗi và timeout:
+
+```mermaid
+flowchart TD
+  A[background.js gọi backend] --> B{Backend phản hồi trong 12 giây?}
+  B -- Có --> C{Response JSON hợp lệ và success=true?}
+  B -- Không --> D[Abort request và báo lỗi timeout]
+  C -- Có --> E[Trả data về content.js]
+  C -- Không --> F[Hiển thị error message trong popup]
+  D --> G{Đang dùng production URL mặc định?}
+  G -- Có --> H[Thử fallback sang http://localhost:3000/api/translate]
+  G -- Không --> F
+  H --> C
+```
+
+Các tối ưu giúp chạy tốt trên nhiều website:
+
+- Bắt nhiều loại sự kiện selection thay vì chỉ `mouseup`.
+- Lưu snapshot selection để xử lý web dynamic xóa selection quá nhanh.
+- Định vị popup theo viewport, không cộng `scrollX/scrollY`, nên hoạt động tốt trên feed dài như Facebook.
+- Fallback rect từ `range.getClientRects()` nếu `getBoundingClientRect()` rỗng.
+- Chống gọi dịch lặp lại cùng một selection.
+- Tự inject `content.js` và `styles.css` vào các tab đang mở khi extension được cài/reload.
+
 ## Hỗ trợ PDF
 
 Extension tích hợp PDF.js trong `extension/pdf.js`.
